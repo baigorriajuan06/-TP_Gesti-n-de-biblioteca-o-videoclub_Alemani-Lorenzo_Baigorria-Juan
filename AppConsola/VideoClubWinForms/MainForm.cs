@@ -21,8 +21,11 @@ public class MainForm : Form
         [typeof(Devolucion)] = new[] { "Id", "FechaDevolucion", "AlquilerId" }
     };
 
-    public MainForm()
+    private readonly Func<AplicationDbContext> _createDbContext;
+
+    public MainForm(Func<AplicationDbContext> createDbContext)
     {
+        _createDbContext = createDbContext ?? throw new ArgumentNullException(nameof(createDbContext));
         Text = "Gestión de Videoclub - Alemani / Baigorria";
         Width = 1150; Height = 740; StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(850, 550);
@@ -99,7 +102,7 @@ public class MainForm : Form
         {
             try
             {
-                using var db = new AplicationDbContext();
+                using var db = _createDbContext();
                 var table = new DataTable();
                 switch (comboReportes.SelectedIndex)
                 {
@@ -217,7 +220,7 @@ public class MainForm : Form
 
     private void RefreshEntity(Type type)
     {
-        using var db = new AplicationDbContext();
+        using var db = _createDbContext();
         IEnumerable<object> entities = type == typeof(Socio) ? db.Socio.AsNoTracking().Cast<object>().ToList()
             : type == typeof(Pelicula) ? db.Pelicula.AsNoTracking().Cast<object>().ToList()
             : type == typeof(Proveedor) ? db.Proveedor.AsNoTracking().Cast<object>().ToList()
@@ -289,7 +292,7 @@ public class MainForm : Form
     {
         int? id = editing ? SelectedId(type) : null;
         if (editing && id == null) return;
-        using var db = new AplicationDbContext();
+        using var db = _createDbContext();
         var entity = editing ? db.Find(type, id!.Value) : Activator.CreateInstance(type);
         if (entity == null) return;
         var props = columns[type].Where(n => n != "Id").Select(n => type.GetProperty(n)!).ToArray();
@@ -351,7 +354,7 @@ public class MainForm : Form
         var id = SelectedId(type); if (id == null) return;
         if (MessageBox.Show("¿Eliminar el registro seleccionado?", "Confirmar baja", MessageBoxButtons.YesNo)
             != DialogResult.Yes) return;
-        using var db = new AplicationDbContext();
+        using var db = _createDbContext();
         var entity = db.Find(type, id.Value);
         if (entity != null) { db.Remove(entity); db.SaveChanges(); }
         RefreshAll();
@@ -359,7 +362,7 @@ public class MainForm : Form
 
     private void RegisterRental()
     {
-        using var db = new AplicationDbContext();
+        using var db = _createDbContext();
         var socios = db.Socio.OrderBy(s => s.Id).ToList();
         var pelis = db.Pelicula.Where(p => p.Disponible && p.Cantidad > 0).OrderBy(p => p.Titulo).ToList();
         if (socios.Count == 0 || pelis.Count == 0)
@@ -414,7 +417,7 @@ public class MainForm : Form
 
     private void RegisterReturn()
     {
-        using var db = new AplicationDbContext();
+        using var db = _createDbContext();
         var active = db.Alquiler.Include(a => a.listapeliculas).Where(a => a.Estado == "Activo").ToList();
         if (active.Count == 0) { MessageBox.Show("No hay alquileres activos."); return; }
         using var form = new Form { Text = "Registrar devolución", Width = 480, Height = 220, StartPosition = FormStartPosition.CenterParent };
